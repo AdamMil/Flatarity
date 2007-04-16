@@ -17,6 +17,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using GameLib;
 using GameLib.Events;
 using GameLib.Fonts;
@@ -24,9 +25,10 @@ using GameLib.Input;
 using GameLib.Mathematics;
 using GameLib.Mathematics.TwoD;
 using GameLib.Video;
+using BinaryReader = AdamMil.IO.BinaryReader;
+using BinaryWriter = AdamMil.IO.BinaryWriter;
 using Color = System.Drawing.Color;
 using Debug = System.Diagnostics.Debug;
-using Path  = System.IO.Path;
 using SPoint=System.Drawing.Point;
 
 namespace Flatarity
@@ -35,6 +37,7 @@ namespace Flatarity
 static class Game
 {
   const int MaxGridSize = 32;
+  const int SaveVersion = 1;
 
   static void Main()
   {
@@ -50,8 +53,9 @@ static class Game
     font.Style = FontStyle.Bold;
     font.RenderStyle = RenderStyle.Blended;
 
-    GenerateLevel(1);
+    LoadGame();
     Events.PumpEvents(EventProc, IdleProc);
+    SaveGame();
 
     Video.Deinitialize();
     Input.Deinitialize();
@@ -124,7 +128,7 @@ static class Game
     Game.level  = level;
     ResetViewpoint();
     Timing.Reset();
-    pauseTime = 0;
+    timeOffset = 0;
   }
 
   /// <summary>Gets the center point of the selected vertices.</summary>
@@ -162,6 +166,41 @@ static class Game
       Vertices[vertex].Position.Y += (centerPt.Y-Vertices[vertex].Position.Y)*2;
     }
     doRepaint = true;
+  }
+
+  static void LoadGame()
+  {
+    GenerateLevel(1);
+
+    string saveFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                                   "Flatarity/save.dat");
+    if(File.Exists(saveFile))
+    {
+      try
+      {
+        using(FileStream stream = new FileStream(saveFile, FileMode.Open, FileAccess.Read, FileShare.Read))
+        using(BinaryReader br = new BinaryReader(stream))
+        {
+          if(br.ReadInt32() == SaveVersion)
+          {
+            Vertices = new Vertex[br.ReadInt32()];
+            for(int i=0; i<Vertices.Length; i++) Vertices[i] = new Vertex(br);
+            Connections = new Connection[br.ReadInt32()];
+            for(int i=0; i<Connections.Length; i++) Connections[i] = new Connection(br);
+            selected.AddRange(br.ReadInt32(br.ReadInt32()));
+            cameraPoint = new Point(br.ReadDouble(), br.ReadDouble());
+            zoomLevel   = br.ReadDouble();
+            timeOffset  = br.ReadDouble();
+            score       = br.ReadInt32();
+            level       = br.ReadInt32();
+            gridSize    = br.ReadInt32();
+          }
+
+          Timing.Reset();
+        }
+      }
+      catch { GenerateLevel(1); }
+    }
   }
 
   static void MarkMoved(bool moved)
@@ -341,6 +380,10 @@ static class Game
               }
               doRepaint = true;
             }
+          }
+          else if(c == 'P')
+          {
+            Pause();
           }
         }
         else if(Keyboard.IsModKey(ke.Key) && dragButton == MouseButton.Left)
@@ -569,7 +612,7 @@ static class Game
 
   static void CheckSolution()
   {
-    double elapsedTime = Timing.Seconds - pauseTime;
+    double elapsedTime = Timing.Seconds + timeOffset;
     
     bool failed = false;
     for(int i=0; i<Connections.Length; i++)
@@ -651,8 +694,38 @@ static class Game
       }
     }
 
-    pauseTime += Timing.Seconds-startTime;
-    paused = false;
+    timeOffset -= Timing.Seconds-startTime;
+    paused      = false;
+    doRepaint   = true;
+  }
+
+  static void SaveGame()
+  {
+    try
+    {
+      string saveDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Flatarity");
+      Directory.CreateDirectory(saveDir);
+    
+      using(FileStream stream = new FileStream(Path.Combine(saveDir, "save.dat"), FileMode.Create, FileAccess.Write))
+      using(BinaryWriter bw = new BinaryWriter(stream))
+      {
+        bw.Write(SaveVersion);
+        bw.Write(Vertices.Length);
+        for(int i=0; i<Vertices.Length; i++) Vertices[i].Write(bw);
+        bw.Write(Connections.Length);
+        for(int i=0; i<Connections.Length; i++) Connections[i].Write(bw);
+        bw.Write(selected.Count);
+        bw.Write(selected.ToArray());
+        bw.Write(cameraPoint.X);
+        bw.Write(cameraPoint.Y);
+        bw.Write(zoomLevel);
+        bw.Write(timeOffset + Timing.Seconds);
+        bw.Write(score);
+        bw.Write(level);
+        bw.Write(gridSize);
+      }
+    }
+    catch { }
   }
 
   static void SelectAll()
@@ -691,7 +764,7 @@ static class Game
     if(form.ShowDialog() == System.Windows.Forms.DialogResult.OK)
     {
       score = 0;
-      GenerateLevel(form.Level);
+      GenerateLevel(Math.Max(1, form.Level));
     }
   }
 
@@ -847,6 +920,13 @@ static class Game
       Failed = false;
     }
 
+    public Connection(BinaryReader br)
+    {
+      First  = br.ReadInt32();
+      Second = br.ReadInt32();
+      Failed = br.ReadBool();
+    }
+
     public Line GetLine()
     {
       return new Line(Vertices[First].Position, Vertices[Second].Position);
@@ -860,6 +940,13 @@ static class Game
     public override string ToString()
     {
       return string.Format("{0}-{1}", First, Second);
+    }
+
+    public void Write(BinaryWriter bw)
+    {
+      bw.Write(First);
+      bw.Write(Second);
+      bw.Write(Failed);
     }
 
     public int First, Second;
@@ -892,6 +979,13 @@ static class Game
   #region Vertex
   struct Vertex
   {
+    public Vertex(BinaryReader br)
+    {
+      Position = new Point(br.ReadDouble(), br.ReadDouble());
+      Moved    = br.ReadBool();
+      ConnectedToHighlight = false;
+    }
+    
     public int Radius
     {
       get { return Moved ? 5 : 8; }
@@ -907,6 +1001,13 @@ static class Game
     public SPoint GetScreenPoint()
     {
       return Game.ToScreenPoint(Position);
+    }
+
+    public void Write(BinaryWriter bw)
+    {
+      bw.Write(Position.X);
+      bw.Write(Position.Y);
+      bw.Write(Moved);
     }
 
     /// <summary>The location of the vertex. At a normal zoom factor, the coordinates range from -1 (top, left) to
@@ -934,7 +1035,7 @@ static class Game
   static TrueTypeFont font;
   static readonly Random rand = new Random();
   static Point cameraPoint, dragPoint, mouseDownPoint;
-  static double zoomLevel = 1, pauseTime;
+  static double zoomLevel = 1, timeOffset;
   static int score, level, dragVertex, highlighted, buttonPress, buttonOver, gridSize = MaxGridSize;
   static MouseButton dragButton = NotDragging;
   static bool doRepaint = true, paused;
