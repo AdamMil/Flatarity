@@ -11,8 +11,9 @@ Features:
 * Flipping and rotating vertices
 * Zooming and panning the display
 * Snapping vertices to a grid
+* Automatic saving and loading of your game and settings
 * Resizable window
-* Higher performance
+* Higher performance (via poorer graphics)
 
 Directions:
 * Left-drag in empty space to start selecting multiple vertices.
@@ -30,3 +31,11 @@ Directions:
 * Press 'C' to select the vertices connected to the vertex under the mouse.
   This is useful at very high levels where may be difficult to select the
   vertex you want.
+* Press 'P' to pause (or click the button in the bottom right).
+
+Credit:
+Thanks to John Tantalo for the cool game, the inspiration, and the algorithm
+for generating planar graphs, which I got from here:
+http://www.johntantalo.com/wiki/Planarity
+
+Thanks to Microsoft for the .NET platform.
