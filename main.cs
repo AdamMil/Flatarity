@@ -754,7 +754,7 @@ static class Game
       Vertices[i].Position = new Point(rand.NextDouble()*2-1, rand.NextDouble()*2-1);
       Vertices[i].Moved    = false;
     }
-    doRepaint = true;
+    ResetViewpoint();
   }
 
   static void SkipToLevel()
