@@ -31,7 +31,8 @@ Directions:
 * Press 'C' to select the vertices connected to the vertex under the mouse.
   This is useful at very high levels where may be difficult to select the
   vertex you want.
-* Press 'P' to pause (or click the button in the bottom right).
+* Press 'P' to pause.
+* Press Enter to check your solution.
 
 Credit:
 Thanks to John Tantalo for the cool game, the inspiration, and the algorithm
