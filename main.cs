@@ -131,6 +131,17 @@ static class Game
     timeOffset = 0;
   }
 
+  /// <summary>Gets the amount that the grid is offset by the location of the camera. If the grid is not offset (ie,
+  /// the camera is at 0,0), the point returned will also be at 0,0.
+  /// </summary>
+  static SPoint GetGridOffset()
+  {
+    if(cameraPoint.X == 0 && cameraPoint.Y == 0) return new SPoint(0, 0);
+
+    SPoint screenCenter = new SPoint(Video.Width/2, Video.Height/2), cameraOffset = ToScreenPoint(new Point(0, 0));
+    return new SPoint((cameraOffset.X-screenCenter.X)&(gridSize-1), (cameraOffset.Y-screenCenter.Y)&(gridSize-1));
+  }
+  
   /// <summary>Gets the center point of the selected vertices.</summary>
   static Point GetSelectedCenter()
   {
@@ -229,12 +240,13 @@ static class Game
 
     if(gridSize != 0)
     {
+      SPoint gridOffset = GetGridOffset();
       Color gridColor = Color.FromArgb(248, 248, 248);
-      for(int y=0,width=Video.Width-1; y<Video.Height; y += gridSize)
+      for(int y=gridOffset.Y,width=Video.Width-1; y<Video.Height; y += gridSize)
       {
         Primitives.HLine(Video.DisplaySurface, 0, width, y, gridColor);
       }
-      for(int x=0,height=Video.Height-1; x<Video.Width; x += gridSize)
+      for(int x=gridOffset.X,height=Video.Height-1; x<Video.Width; x += gridSize)
       {
         Primitives.VLine(Video.DisplaySurface, x, 0, height, gridColor);
       }
@@ -381,9 +393,13 @@ static class Game
               doRepaint = true;
             }
           }
-          else if(c == 'P')
+          else if(c == 'P') // 'P' to pause
           {
             Pause();
+          }
+          else if(ke.Key == Key.Enter || ke.Key == Key.KpEnter) // Enter to advance
+          {
+            CheckSolution();
           }
         }
         else if(Keyboard.IsModKey(ke.Key) && dragButton == MouseButton.Left)
@@ -427,6 +443,10 @@ static class Game
             }
             else if(dragVertex != -1)
             {
+              // if we're dragging vertices with a grid, snap the mousedown point to the grid so that the calculation
+              // of mouse movement distance can assume it started at a grid point
+              if(gridSize != 0) mouseDownPoint = ToVirtualPoint(SnapToGrid(ToScreenPoint(mouseDownPoint)));
+              
               if(Keyboard.HasOnly(KeyMod.Ctrl)) // a ctrl-click toggles the selection of a vertex
               {
                 if(selected.Contains(dragVertex)) selected.Remove(dragVertex);
@@ -613,6 +633,9 @@ static class Game
   static void CheckSolution()
   {
     double elapsedTime = Timing.Seconds + timeOffset;
+
+    // reset failed flags
+    for(int i=0; i<Connections.Length; i++) Connections[i].Failed = false;
     
     bool failed = false;
     for(int i=0; i<Connections.Length; i++)
@@ -772,11 +795,15 @@ static class Game
   {
     if(gridSize > 0)
     {
+      SPoint gridOffset = GetGridOffset();
+      pt.X -= gridOffset.X;
+      pt.Y -= gridOffset.Y;
       // we know gridSize is a power of two so we can subtract one to get a mask
       int halfGrid = gridSize/2, gridMask = gridSize-1, xd = pt.X & gridMask, yd = pt.Y & gridMask;
-      pt.X &= ~gridMask;
+      gridMask = ~gridMask;
+      pt.X &= gridMask;
       if(xd >= halfGrid) pt.X += gridSize;
-      pt.Y &= ~gridMask;
+      pt.Y &= gridMask;
       if(yd >= halfGrid) pt.Y += gridSize;
     }
     return pt;
@@ -797,8 +824,8 @@ static class Game
     // with a zoom level of 1.0 and a camera at (0,0), this corresponds a square area in the middle of the screen.
     // choose a zoom factor that will scale it into the range 0-width_of_square
     double zoomFactor = zoomLevel * 0.5 * Math.Min(Video.Width, Video.Height);
-    return new SPoint((int)((virtualPt.X-cameraPoint.X) * zoomFactor)+Video.Width /2,
-                      (int)((virtualPt.Y-cameraPoint.Y) * zoomFactor)+Video.Height/2);
+    return new SPoint((int)Math.Round((virtualPt.X-cameraPoint.X) * zoomFactor)+Video.Width /2,
+                      (int)Math.Round((virtualPt.Y-cameraPoint.Y) * zoomFactor)+Video.Height/2);
   }
 
   static void UpdateButtonOver()
