@@ -647,6 +647,8 @@ static class Game
         // skip lines that share a vertex
         if(iConn.Hasvertex(Connections[j].First) || iConn.Hasvertex(Connections[j].Second)) continue;
 
+        // FIXME: this may return true even if they don't intersect, if the segments are very nearly parallel. this is
+        // due to GameLib not using an epsilon and the divisor being very close to but not quite zero
         if(iLine.SegmentIntersects(Connections[j].GetLine()))
         {
           Connections[i].Failed = Connections[j].Failed = failed = true;
@@ -796,15 +798,12 @@ static class Game
     if(gridSize > 0)
     {
       SPoint gridOffset = GetGridOffset();
-      pt.X -= gridOffset.X;
-      pt.Y -= gridOffset.Y;
-      // we know gridSize is a power of two so we can subtract one to get a mask
-      int halfGrid = gridSize/2, gridMask = gridSize-1, xd = pt.X & gridMask, yd = pt.Y & gridMask;
-      gridMask = ~gridMask;
-      pt.X &= gridMask;
-      if(xd >= halfGrid) pt.X += gridSize;
-      pt.Y &= gridMask;
-      if(yd >= halfGrid) pt.Y += gridSize;
+      int gridMask = gridSize-1, halfGrid = gridSize/2;
+      int       xd = (pt.X-gridOffset.X) & gridMask, yd = (pt.Y-gridOffset.Y) & gridMask;
+      if(xd >= halfGrid) xd -= gridSize;
+      if(yd >= halfGrid) yd -= gridSize;
+      pt.X -= xd;
+      pt.Y -= yd;
     }
     return pt;
   }
