@@ -241,7 +241,7 @@ static class Game
     if(gridSize != 0)
     {
       SPoint gridOffset = GetGridOffset();
-      Color gridColor = Color.FromArgb(248, 248, 248);
+      Color gridColor = Color.FromArgb(224, 224, 224);
       for(int y=gridOffset.Y,width=Video.Width-1; y<Video.Height; y += gridSize)
       {
         Primitives.HLine(Video.DisplaySurface, 0, width, y, gridColor);
