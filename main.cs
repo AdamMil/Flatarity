@@ -22,8 +22,8 @@ using GameLib;
 using GameLib.Events;
 using GameLib.Fonts;
 using GameLib.Input;
-using GameLib.Mathematics;
-using GameLib.Mathematics.TwoD;
+using AdamMil.Mathematics.Geometry;
+using AdamMil.Mathematics.Geometry.TwoD;
 using GameLib.Video;
 using BinaryReader = AdamMil.IO.BinaryReader;
 using BinaryWriter = AdamMil.IO.BinaryWriter;
@@ -259,7 +259,7 @@ static class Game
     font.BackColor = Color.White;
     font.Color     = Color.DarkGray;
     font.Render(Video.DisplaySurface, "Score: "+score, 5, 5);
-    font.Render(Video.DisplaySurface, "Level: "+level, 5, 5+font.LineSkip);
+    font.Render(Video.DisplaySurface, "Level: "+level, 5, 5+font.LineHeight);
 
     // reset per-vertex render state
     for(int i=0; i<Vertices.Length; i++) Vertices[i].ConnectedToHighlight = false;
@@ -405,7 +405,7 @@ static class Game
         else if(Keyboard.IsModKey(ke.Key) && dragButton == MouseButton.Left)
         {
           if(dragVertex == -1 && buttonPress == -1 &&
-             savedPoints != null && (ke.Key == Key.LAlt || ke.Key == Key.RAlt)) // undo rotation
+             savedPoints != null && (ke.Key == Key.LeftAlt || ke.Key == Key.RightAlt)) // undo rotation
           {
             for(int i=0; i<savedPoints.Length; i++) Vertices[selected[i]].Position = savedPoints[i];
             FinishDrag();
